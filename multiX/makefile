@@ -22,8 +22,8 @@ EXAMPLE_C_FILES := $(call rwildcard, $(EXAMPLE_DIR), *.c)
 OBJ_FILES = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(C_FILES))
 EXAMPLES := $(patsubst $(EXAMPLE_DIR)/%.c,$(EXAMPLE_BIN_DIR)/%,$(EXAMPLE_C_FILES))
 
-LD_FLAGS += -std=c99 -lpthread
-C_FLAGS += -O2 -pipe -march=native -I$(PROJECT_DIR)headers
+LD_FLAGS += --std=c99 -lpthread
+C_FLAGS += --std=c99 -O2 -pipe -march=native -I$(PROJECT_DIR)headers
 
 lib: $(OBJ_FILES)
 	$(call CHK_DIR_EXISTS, $(LIB_DIR))
