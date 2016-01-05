@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <immintrin.h>
-
 #if defined(__i386__)
 static __inline__ uint32_t rdtsc(void)
 {
@@ -57,41 +56,38 @@ void print_matrix_4x4(v4d* A){
   }
 }
 
-void MxM_4x4(v4d *A, v4d *B){
+void MxM_4x4(v4d *A, v4d *B, v4d *C){
   matrix_4x4_t B_t;
   load_transpose_4x4(B, B_t);
-  puts("B^T = ");
-  print_matrix_4x4(B_t);
 
   for(int i = 0; i < 4; i++){
     v4d tmp_col_1 = A[i] * B_t[0];
-    printf("Col_1 = ");
-    print_v4d(tmp_col_1);
     v4d tmp_col_2 = A[i] * B_t[1];
-    printf("Col_2 = ");
-    print_v4d(tmp_col_2);
     v4d tmp_col_3 = A[i] * B_t[2];
-    printf("Col_3 = ");
-    print_v4d(tmp_col_3);
     v4d tmp_col_4 = A[i] * B_t[3];
-    printf("Col_4 = ");
-    print_v4d(tmp_col_4);
 
     v4d x = __builtin_ia32_haddpd256(tmp_col_1, tmp_col_2); //(1,1)+(1,2), (2,1)+(2,2)| (1,3)+(1,4), (2,3)+(2,4)
-    printf("x = ");
-    print_v4d(x);
     v4d y = __builtin_ia32_haddpd256(tmp_col_3, tmp_col_4); //(3,1)+(3,2), (4,1)+(4,2)| (3,3)+(3,4), (4,3)+(4,4)
-    printf("y = ");
-    print_v4d(y);
 
     v4d first = __builtin_ia32_vperm2f128_pd256(y,x, 0b000010); // 1(1,2), 2(1,2) | 3(1,2), 4(1,2)
-    printf("first = ");
-    print_v4d(first);
     v4d last = __builtin_ia32_vperm2f128_pd256(y,x, 0b010011); // 1(3,4), 2(3,4) | 3(3,4),4(3,4)
-    printf("last = ");
-    print_v4d(last);
-    A[i] = first+last;
-    puts("");
+    C[i] = first+last;
+  }
+}
+
+void MxM_4x4_2(v4d* A, v4d* B, v4d *C){
+//Intel's method (https://software.intel.com/en-us/articles/benefits-of-intel-avx-for-small-matrices)
+//After compiler optimizations.
+//Faster then O2 of version one, but slower than the O3 version.
+  for(int row = 0; row < 4; row++){
+    v4d broadcast[4];
+    for(int i = 0; i < 4; i++)
+      broadcast[i] = _mm256_broadcast_sd(((double*)&(A[row]))+i);
+    v4d new_row = broadcast[0]*B[0];
+    new_row += broadcast[1]*B[1];
+    new_row += broadcast[2]*B[2];
+    new_row += broadcast[3]*B[3];
+    C[row] = new_row;
   }
 }
 
@@ -147,21 +143,31 @@ double dot_serial(double *x, double *y, const int N){
 }
 
 int main(int argc, char** argv){
-  matrix_4x4_t A, B;
+  matrix_4x4_t A, B, C;
   for(int i = 0; i < 4; i++){
     for(int j = 0; j < 4; j++){
-      A[i][j] = (i+1.0)/(j+1);
-      B[i][j] = (j+i)/3.0;
+      A[i][j] = (i+1.0)/(1000*(j+1));
+      B[i][j] = (j+i)/300.0;
     }
     printf("[%1.2f %1.2f %1.2f %1.2f] [%1.2f %1.2f %1.2f %1.2f]\n",
             A[i][0], A[i][1], A[i][2], A[i][3], B[i][0], B[i][1], B[i][2], B[i][3]);
   }
-  MxM_4x4(A,B);
-  puts("=");
-  for(int i = 0; i < 4; i++){
-    printf("[%1.2f %1.2f %1.2f %1.2f]\n",
-          A[i][0], A[i][1], A[i][2], A[i][3]);
-  }
+  #define LOOPS 8000
+  size_t T;
+  timeCall(
+    for(int i = 0; i < LOOPS; i++){
+      MxM_4x4(A,B,B);
+    },
+    T);
+  printf("ticks: %lu\n", T);
+  print_matrix_4x4(B);
+  timeCall(
+    for(int i = 0; i < LOOPS; i++){
+      MxM_4x4_2(A,B,B);
+    }
+    ,T);
+  printf("ticks: %lu\n", T);
+  print_matrix_4x4(B);
   // double *x, *y;
   // const int N = 103;
   // const int M = 50000;
