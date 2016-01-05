@@ -1,4 +1,4 @@
-#include "../headers/multiX.h"
+#include <multiX.h>
 
 #include <unistd.h> //for the number of cpus
 #include <stdlib.h>

@@ -1,4 +1,4 @@
-#include "../headers/multiX.h"
+#include <multiX.h>
 #include <stdio.h>
 
 void my_work_func(void* args){//http://stackoverflow.com/a/13001749/5133184
