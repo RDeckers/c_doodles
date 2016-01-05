@@ -146,28 +146,28 @@ int main(int argc, char** argv){
   matrix_4x4_t A, B, C;
   for(int i = 0; i < 4; i++){
     for(int j = 0; j < 4; j++){
-      A[i][j] = (i+1.0)/(1000*(j+1));
-      B[i][j] = (j+i)/300.0;
+      A[i][j] = (i+1.0)/((j+1));
+      B[i][j] = (j+i)/3.0;
     }
     printf("[%1.2f %1.2f %1.2f %1.2f] [%1.2f %1.2f %1.2f %1.2f]\n",
             A[i][0], A[i][1], A[i][2], A[i][3], B[i][0], B[i][1], B[i][2], B[i][3]);
   }
-  #define LOOPS 8000
+  #define LOOPS (1 << 20)
   size_t T;
   timeCall(
     for(int i = 0; i < LOOPS; i++){
-      MxM_4x4(A,B,B);
+      MxM_4x4(A,B,C);
     },
     T);
   printf("ticks: %lu\n", T);
-  print_matrix_4x4(B);
+  print_matrix_4x4(C);
   timeCall(
     for(int i = 0; i < LOOPS; i++){
-      MxM_4x4_2(A,B,B);
+      MxM_4x4_2(A,B,C);
     }
     ,T);
   printf("ticks: %lu\n", T);
-  print_matrix_4x4(B);
+  print_matrix_4x4(C);
   // double *x, *y;
   // const int N = 103;
   // const int M = 50000;
