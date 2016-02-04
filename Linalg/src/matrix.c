@@ -41,13 +41,36 @@ void MxM_square(v4d* A, v4d* B, v4d* C, unsigned N){
     for(unsigned xB = 0; xB < N_reduced; xB++){
       v4d sum = {0,0,0,0};
       for(unsigned xA = 0; xA < N; xA++){
-        v4d broadcast = _mm256_broadcast_sd(((double*)(&(A[yA])))+xA);
+        v4d broadcast = _mm256_broadcast_sd(((double*)(&(A[yA*N_reduced])))+xA);//for very large matrices, this CL could get evicted before it's used again?
+        //buffer 8 broadcasts (1 CL) in registers so that we have at most a 1/8 miss.
         sum += broadcast*B[N_reduced*xA+xB];
       }
       C[xB+N_reduced*xB] = sum;
     }
   }
 }
+
+void MxM_square_2(v4d* A, v4d* B, v4d* C, unsigned N){
+  const unsigned N_reduced = N/4;
+  for(unsigned yA = 0; yA < N; yA++){
+    for(unsigned xB = 0; xB < N_reduced; xB+=2){
+      v4d sum[2] = {{0,0,0,0}, {0,0,0,0}};
+      for(unsigned xA = 0; xA < N; xA++){
+        v4d broadcast = _mm256_broadcast_sd(((double*)(&(A[yA*N_reduced])))+xA);
+        sum[0] += broadcast*B[N_reduced*xA+xB];
+        sum[1] += broadcast*B[N_reduced*xA+xB+1];
+      }
+      C[xB+N_reduced*xB] = sum[0];
+      C[xB+N_reduced*xB+1] = sum[1];
+    }
+  }
+}
+
+//TODO: transpose method like below and/or in place transpose of B
+//TODO: cached broadcasts (cache into single register, then broadcast from register?)
+//TODO: Run Intel thingy to measure actual cache hit ratio.
+//TODO: Pin to core/high process affinity for more accurate measurements under load.
+//TODO: Pinned multithreading.
 
 void MxM_4x4(v4d *A, v4d *B, v4d *C){
   matrix_4x4_t B_t;
