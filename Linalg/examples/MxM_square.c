@@ -6,7 +6,7 @@
 #include <intrin.h>
 #include <malloc.h>
 
-#define N 4*512 //size of our matrix measured in doubles. Always a multiple of 4 to make our lives easier
+#define N 8*250 //size of our matrix measured in doubles. Always a multiple of 4 to make our lives easier
 
 
 void wipe_cache() __attribute__((optimize(0)));
@@ -37,9 +37,9 @@ int reinitialize_matrices(v4d **A, v4d **B, v4d **C){
     return ret;
   for(unsigned y = 0; y < N; y++){
     for(unsigned x = 0; x < N; x++){
-      ((double*)A_2)[y*N+x] = rand();
-      ((double*)B_2)[y*N+x] = rand();
-      ((double*)C_2)[y*N+x] = rand();
+      ((double*)A_2)[y*N+x] = rand() /((double) RAND_MAX);
+      ((double*)B_2)[y*N+x] = rand() /((double) RAND_MAX);
+      //((double*)C_2)[y*N+x] = rand() /((double) RAND_MAX);
     }
   }
   _aligned_free(*A);
