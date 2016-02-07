@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <immintrin.h>
 
-void load_transpose_4x4(v4d* A, v4d *At){
+inline void load_transpose_4x4(v4d* A, v4d *At){
   for(int i = 0; i < 4; i++){
     At[0][i] = A[i][0];
     At[1][i] = A[i][1];
@@ -25,12 +25,13 @@ void print_matrix_4x4(v4d* A){
 }
 
 void MxM_square_scalar(double* A, double* B, double* C, unsigned N){
-  for (int j = 0; j < N; j++) {
-    for (int i = 0; i < N; i++) {
-      C[i+N*j] = 0.0;
-      for (int k = 0; k < N; k++) {
-        C[i+N*j] += A[i+N*k] * B[k+N*j];
+  for (int yA = 0; yA < N; yA++) {
+    for (int xB = 0; xB < N; xB++) {
+      double tmp = 0.0;
+      for (int loop = 0; loop < N; loop++) {
+        tmp += A[yA*N+loop] * B[xB+N*loop];
       }
+      C[yA*N+xB] = tmp;
     }
   }
 }
@@ -45,7 +46,7 @@ void MxM_square(v4d* A, v4d* B, v4d* C, unsigned N){
         //buffer 8 broadcasts (1 CL) in registers so that we have at most a 1/8 miss.
         sum += broadcast*B[N_reduced*xA+xB];
       }
-      C[xB+N_reduced*xB] = sum;
+      C[xB+N_reduced*yA] = sum;
     }
   }
 }
@@ -60,17 +61,37 @@ void MxM_square_2(v4d* A, v4d* B, v4d* C, unsigned N){
         sum[0] += broadcast*B[N_reduced*xA+xB];
         sum[1] += broadcast*B[N_reduced*xA+xB+1];
       }
-      C[xB+N_reduced*xB] = sum[0];
-      C[xB+N_reduced*xB+1] = sum[1];
+      C[xB+N_reduced*yA] = sum[0];
+      C[xB+N_reduced*yA+1] = sum[1];
     }
   }
 }
+//
+// void MxM_square_4(v4d* A, v4d* B, v4d* C, unsigned N){
+//   const unsigned N_reduced = N/4;
+//   for(unsigned yA = 0; yA < N; yA++){
+//     for(unsigned xB = 0; xB < N_reduced; xB+=2){
+//       v4d sum[2] = {{0,0,0,0}, {0,0,0,0}};
+//       for(unsigned xA = 0; xA < N; xA++){
+//         v4d broadcast = _mm256_broadcast_sd(((double*)(&(A[yA*N_reduced])))+xA);
+//         const unsigned base = xB + N_reduced*Xa;
+//         const unsigned stride = 1;
+//         sum[0] += broadcast*B[base+0*stride];
+//         sum[1] += broadcast*B[base+1*stride];
+//       }
+//       C[xB+N_reduced*xB] = sum[0];
+//       C[xB+N_reduced*xB+1] = sum[1];
+//     }
+//   }
+// }
 
 //TODO: transpose method like below and/or in place transpose of B
 //TODO: cached broadcasts (cache into single register, then broadcast from register?)
 //TODO: Run Intel thingy to measure actual cache hit ratio.
 //TODO: Pin to core/high process affinity for more accurate measurements under load.
 //TODO: Pinned multithreading.
+//TODO: turn off hardware prefetcher and time again.
+//TODO: use blocking from "more SW optimization"
 
 void MxM_4x4(v4d *A, v4d *B, v4d *C){
   matrix_4x4_t B_t;
@@ -90,6 +111,54 @@ void MxM_4x4(v4d *A, v4d *B, v4d *C){
     C[i] = first+last;
   }
 }
+//
+// void MxM_square_3(v4d* A, v4d* B, v4d* C, unsigned N){
+//   v4d ymm0, ymm1, ymm2, ymm3, ymm4, ymm5, ymm6, ymm7, ymm8, ymm9, ymm10, ymm11, ymm12, ymm13, ymm14, ymm15;
+//   const unsigned N_reduced = N/4;
+//   for(unsigned yA = 0; yA < N; yA+=4){
+//     for(unsigned xB = 0; xB < N_reduced; xB+=2){//use 2 xB per loop to maximize cache hits
+//       //output matrices here as well, 8 registers max.
+//       for(unsigned dot_step = 0; dot_step < N_reduced; dot_step++){
+//         const unsigned stride = N_reduced;
+//         const unsigned base_A = yA*N_reduced+dot_step;
+//         //v4d A_sub[4] = {A[base_A+0*stride], A[base_A+1*stride], A[base_A+2*stride], A[base_A+3*stride]}; //4 registers
+//         ymm0 = A[base_A+0*stride];
+//         ymm1 = A[base_A+1*stride];
+//         ymm2 = A[base_A+2*stride];
+//         //Now we need to load a block of B and transpose it. with AVX2 we could use VGATHERPD but my FX-8120 doesn't support that
+//         ymm3 = A[base_A+3*stride];
+//         const unsigned base_B = xB+N_reduced*4*dot_step;
+//         //v4d B_sub[4] = {B[base_B+0*stride], B[base_B+1*stride], B[base_B+2*stride], B[base_B+3*stride]}; //8 registers
+//         //v4d B_subT[4]; //12 registers + 4 registers for output
+//         //load 2 B_sub, 8 registers total
+//         ymm4 = B[base_B+0*stride];
+//         ymm5 = B[base_B+1*stride];
+//         ymm6 = _mm256_unpacklo_pd(ymm4, ymm5);
+//         ymm7 = _mm256_unpackhi_pd(ymm4, ymm5);
+//         //B_sub0,1 now free, load 2 and 3
+//         //introduces dependency.
+//         ymm4 = B[base_B+2*stride];
+//         ymm5 = B[base_B+3*stride];
+//         ymm8 = _mm256_unpacklo_pd(ymm4, ymm5);
+//         ymm9 = _mm256_unpackhi_pd(ymm4, ymm5);
+//         //10 registers max
+//         //dependencies
+//         ymm4 = _mm256_permute2f128_pd(ymm6, ymm8, 0) //TODO: get correct code for this, see above
+//         ymm5 = _mm256_permute2f128_pd(ymm6, ymm8, 0) //TODO: get correct code for this
+//         //done with 0 an 2,
+//
+//         ymm6 = _mm256_permute2f128_pd(ymm7, ymm9, 0) //TODO: get correct code for this
+//         ymm7 = _mm256_permute2f128_pd(ymm7, ymm9, 0) //TODO: get correct code for this
+//         //done with 1 and 3
+//
+//         //subT freed, 8 registers usable.
+//         //B_sub now contains the transpose of B_sub.
+//
+//
+//     }
+//     }
+//   }
+// }
 
 void MxM_4x4_2(v4d* A, v4d* B, v4d *C){
 //Intel's method (https://software.intel.com/en-us/articles/benefits-of-intel-avx-for-small-matrices)

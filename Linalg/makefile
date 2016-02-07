@@ -41,5 +41,8 @@ square : $(EXAMPLE_DIR)/MxM_square.c lib
 4x4 : $(EXAMPLE_DIR)/MxM_4x4.c lib
 	gcc $(C_FLAGS) -L $(LIB_DIR) -Wl,-R -Wl,$(LIB_DIR) -Wl,-rpath=$(LIB_DIR) -Wl,-llinalg -o $(BIN_DIR)/MxM_4x4 $(EXAMPLE_DIR)/MxM_4x4.c
 
+verify : $(EXAMPLE_DIR)/verify.c lib
+	gcc $(C_FLAGS) -L $(LIB_DIR) -Wl,-R -Wl,$(LIB_DIR) -Wl,-rpath=$(LIB_DIR) -Wl,-llinalg -o $(BIN_DIR)/verify $(EXAMPLE_DIR)/verify.c
+
 clean:
 	$(NUKE) "$(BIN_DIR)"
