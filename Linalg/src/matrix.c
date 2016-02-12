@@ -5,17 +5,17 @@
 #include <immintrin.h>
 
 inline void load_transpose_4x4(v4d* A, v4d *At){
-  for(int i = 0; i < 4; i++){
+/*  for(int i = 0; i < 4; i++){
     At[0][i] = A[i][0];
     At[1][i] = A[i][1];
     At[2][i] = A[i][2];
     At[3][i] = A[i][3];
-  }
+  }*/
 }
 
 void print_v4d(v4d v){
-  printf("[%1.2f %1.2f %1.2f %1.2f]\n",
-        v[0], v[1], v[2], v[3]);
+/*  printf("[%1.2f %1.2f %1.2f %1.2f]\n",
+        v[0], v[1], v[2], v[3]);*/
 }
 
 void print_matrix_4x4(v4d* A){
@@ -36,6 +36,34 @@ void MxM_square_scalar(double* A, double* B, double* C, unsigned N){
   }
 }
 
+void M_transpose(v4d* A, v4d* AT, const unsigned N){
+  const int N_reduced = N/4;
+  for(int yA = 0; yA < N; yA+=4){
+    for(int xA = 0; xA < N_reduced; xA++){
+      const int stride = N_reduced;
+      const int base = yA*stride+xA;
+      v4d A_block[] = {
+	A[base+0*stride],
+	A[base+1*stride],
+	A[base+2*stride],
+	A[base+3*stride]
+      };
+      v4d tmp0 = _mm256_unpacklo_pd(A_block[0], A_block[1]);
+      v4d tmp1 = _mm256_unpackhi_pd(A_block[0], A_block[1]);
+      v4d tmp2 = _mm256_unpacklo_pd(A_block[2], A_block[3]);
+      v4d tmp3 = _mm256_unpackhi_pd(A_block[2], A_block[3]);
+
+      const int AT_base = xA*4*stride+yA/4;
+
+      AT[AT_base+0*stride] = _mm256_permute2f128_pd(tmp0, tmp2, 0b00100000);
+      AT[AT_base+1*stride] = _mm256_permute2f128_pd(tmp1, tmp3, 0b00100000);
+
+      AT[AT_base+2*stride] = _mm256_permute2f128_pd(tmp0, tmp2, 0b00110001);
+      AT[AT_base+3*stride] = _mm256_permute2f128_pd(tmp1, tmp3, 0b00110001);
+    }
+  }
+}
+
 void MxM_square(v4d* A, v4d* B, v4d* C, unsigned N){
   const unsigned N_reduced = N/4;
   for(unsigned yA = 0; yA < N; yA++){
@@ -49,6 +77,35 @@ void MxM_square(v4d* A, v4d* B, v4d* C, unsigned N){
       C[xB+N_reduced*yA] = sum;
     }
   }
+}
+
+void MxM_square_T(v4d* A, v4d* BT, v4d* C, const unsigned N){
+ const unsigned N_reduced = N/4;
+ for(unsigned yA = 0; yA < N; yA++){
+  v4d* row = &A[yA*N_reduced];
+  for(unsigned xB = 0; xB < N; xB+=4){
+   v4d *columns[] = {
+    &BT[(xB+0)*N_reduced],//A
+    &BT[(xB+1)*N_reduced],//B
+    &BT[(xB+2)*N_reduced],//C
+    &BT[(xB+3)*N_reduced]//D
+   };
+   v4d sums[] = {{0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0}};
+   for(unsigned i = 0; i < N_reduced; i++){
+    sums[0] += row[i]*columns[0][i];
+    sums[1] += row[i]*columns[1][i];
+    sums[2] += row[i]*columns[2][i];
+    sums[3] += row[i]*columns[3][i];
+   }
+  //combine 4
+  v4d x = _mm256_hadd_pd(sums[0], sums[1]);
+  v4d y = _mm256_hadd_pd(sums[2], sums[3]);
+  v4d first = _mm256_permute2f128_pd(y,x,0b00000010);
+  v4d last = _mm256_permute2f128_pd(y,x, 0b00010011);
+  //C[yA*N_reduced+(xB/4)] = first+last;
+  _mm256_stream_pd(&C[yA*N_reduced+(xB/4)], first+last);
+  }
+ }
 }
 
 void MxM_square_2(v4d* A, v4d* B, v4d* C, unsigned N){
@@ -65,6 +122,23 @@ void MxM_square_2(v4d* A, v4d* B, v4d* C, unsigned N){
       C[xB+N_reduced*yA+1] = sum[1];
     }
   }
+}
+
+void MxM_square_3(v4d* A, v4d* B, v4d* C, unsigned N){
+  const unsigned N_reduced = N/4;
+  for(unsigned yA = 0; yA < N; yA++){
+    for(unsigned xB = 0; xB < N_reduced; xB+=2){
+      v4d sum[2] = {{0,0,0,0}, {0,0,0,0}};
+      for(unsigned xA = 0; xA < N; xA++){
+        v4d broadcast = _mm256_broadcast_sd(((double*)(&(A[yA*N_reduced])))+xA);
+        sum[0] += broadcast*B[N_reduced*xA+xB];
+        sum[1] += broadcast*B[N_reduced*xA+xB+1];
+      }
+      _mm256_stream_pd(&(C[xB+N_reduced*yA]), sum[0]);
+      _mm256_stream_pd(&(C[xB+N_reduced*yA+1]), sum[1]);
+    }
+  }
+ _mm_sfence();
 }
 //
 // void MxM_square_4(v4d* A, v4d* B, v4d* C, unsigned N){
@@ -177,7 +251,7 @@ void MxM_4x4_2(v4d* A, v4d* B, v4d *C){
 }
 
 double dot_vec(v4d *x, v4d* y, const int N){
-  v4d accumulate = {0,0,0,0};
+/*  v4d accumulate = {0,0,0,0};
   int i;
   for (i = 0; i < N/4;i ++){
     accumulate += x[i]*y[i];
@@ -187,7 +261,7 @@ double dot_vec(v4d *x, v4d* y, const int N){
   for(;i < N; i++){
     sum += ((double *)x)[i]*((double*)y)[i];
   }
-  return sum;
+  return sum;*/
 }
 
 double dot_serial(double *x, double *y, const int N){

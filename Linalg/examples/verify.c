@@ -4,18 +4,17 @@
 #include <math.h>
 
 #include <stdlib.h>
-#include <intrin.h>
-#include <malloc.h>
+#include <mm_malloc.h>
 
-#define N 8*100 //size of our matrix measured in doubles. Always a multiple of 4 to make our lives easier
+#define N 512 //size of our matrix measured in doubles. Always a multiple of 4 to make our lives easier
 
 int reinitialize_matrices(v4d **A, v4d **B, v4d **C, v4d **D){
   int ret = 0;
   puts("Initializing...");
-  v4d* A_2 = _aligned_malloc(N*N*sizeof(double),64);//Allign to cachelines instead.
-  v4d* B_2 = _aligned_malloc(N*N*sizeof(double),64);
-  v4d* C_2 = _aligned_malloc(N*N*sizeof(double),64);
-  v4d* D_2 = _aligned_malloc(N*N*sizeof(double),64);
+  v4d* A_2 = _mm_malloc(N*N*sizeof(double),64);//Allign to cachelines instead.
+  v4d* B_2 = _mm_malloc(N*N*sizeof(double),64);
+  v4d* C_2 = _mm_malloc(N*N*sizeof(double),64);
+  v4d* D_2 = _mm_malloc(N*N*sizeof(double),64);
   ret = ((A_2==NULL)||(B_2==NULL)||(C_2==NULL));
   if(ret != 0)
     return ret;
@@ -26,10 +25,10 @@ int reinitialize_matrices(v4d **A, v4d **B, v4d **C, v4d **D){
       //((double*)C_2)[y*N+x] = rand() /((double) RAND_MAX);
     }
   }
-  _aligned_free(*A);
-  _aligned_free(*B);
-  _aligned_free(*C);
-  _aligned_free(*D);
+  _mm_free(*A);
+  _mm_free(*B);
+  _mm_free(*C);
+  _mm_free(*D);
   *A = A_2;
   *B = B_2;
   *C = C_2;
@@ -62,10 +61,10 @@ void print_matrix(double *A, unsigned n){
 int main(int argc, char** argv){
   v4d *A = NULL, *B = NULL, *C = NULL, *Reference = NULL;
   reinitialize_matrices(&A, &B, &C, &Reference);
-  //puts("A =========================");
-  //print_matrix((double*)A, N);
-  //puts("B =========================");
-  //print_matrix((double*)B, N);
+//  puts("A =========================");
+//  print_matrix((double*)A, N);
+//  puts("B =========================");
+//  print_matrix((double*)B, N);
   #define LOOPS (1 << 0)
   puts("Computing reference...");
   MxM_square_scalar((double*)A,(double*)B,(double*)Reference, N);
@@ -80,7 +79,14 @@ int main(int argc, char** argv){
   puts("Verifying 2...");
   MxM_square_2(A,B,C, N);
   printf("Max diff = %e\n", verify((double*)C, (double*)Reference, N));
+  puts("Verifying 3...");
+  MxM_square_3(A,B,C, N);
+  printf("Max diff = %e\n", verify((double*)C, (double*)Reference, N));
+  puts("Verifying T...");
+  M_transpose(B, C, N);
+  MxM_square_T(A,C, B, N);
+  printf("Max diff = %e\n", verify((double*)B, (double*)Reference, N));
   //puts("C =========================");
-  //print_matrix((double*)C, N);
+  //print_matrix((double*)B, N);
   return 0;
 }

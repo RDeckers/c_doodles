@@ -27,13 +27,13 @@ EXAMPLE_C_FILES := $(call rwildcard, $(EXAMPLE_DIR), *.c)
 OBJ_FILES = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(C_FILES))
 EXAMPLES := $(patsubst $(EXAMPLE_DIR)/%.c,$(EXAMPLE_BIN_DIR)/%,$(EXAMPLE_C_FILES))
 
-C_FLAGS += --std=c11 -flto -O3 -pipe -march=native -I$(PROJECT_DIR)headers
+C_FLAGS += --std=gnu99 -O3 -pipe -march=native -I$(PROJECT_DIR)headers
 
 lib: $(C_FILES)
 	$(call CHK_DIR_EXISTS, $(LIB_DIR))
-	gcc -fpic -shared $(C_FLAGS) -o $(LIB_DIR)/$(LIB_NAME)$(LIB_SUFFIX) $<
+	gcc -fpic -shared $(C_FLAGS) -o $(LIB_DIR)/lib$(LIB_NAME)$(LIB_SUFFIX) $<
 
-all : 4x4 square
+all : 4x4 square verify verify_transpose
 
 square : $(EXAMPLE_DIR)/MxM_square.c lib
 	gcc $(C_FLAGS) -L $(LIB_DIR) -Wl,-R -Wl,$(LIB_DIR) -Wl,-rpath=$(LIB_DIR) -Wl,-llinalg -o $(BIN_DIR)/MxM_square $(EXAMPLE_DIR)/MxM_square.c
@@ -43,6 +43,9 @@ square : $(EXAMPLE_DIR)/MxM_square.c lib
 
 verify : $(EXAMPLE_DIR)/verify.c lib
 	gcc $(C_FLAGS) -L $(LIB_DIR) -Wl,-R -Wl,$(LIB_DIR) -Wl,-rpath=$(LIB_DIR) -Wl,-llinalg -o $(BIN_DIR)/verify $(EXAMPLE_DIR)/verify.c
+
+verify_transpose : $(EXAMPLE_DIR)/verify_transpose.c lib
+	gcc $(C_FLAGS) -L $(LIB_DIR) -Wl,-R -Wl,$(LIB_DIR) -Wl,-rpath=$(LIB_DIR) -Wl,-llinalg -o $(BIN_DIR)/verify_transpose $(EXAMPLE_DIR)/verify_transpose.c
 
 clean:
 	$(NUKE) "$(BIN_DIR)"

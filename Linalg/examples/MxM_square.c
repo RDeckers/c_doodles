@@ -3,11 +3,10 @@
 #include <stdio.h>
 
 #include <stdlib.h>
-#include <intrin.h>
-#include <malloc.h>
+#include <mm_malloc.h>
 
-#define N 8*250 //size of our matrix measured in doubles. Always a multiple of 4 to make our lives easier
-
+#define N 8*64 //size of our matrix measured in doubles. Always a multiple of 4 to make our lives easier
+#define _aligned_malloc(S,A) aligned_malloc(A,S)
 
 void wipe_cache() __attribute__((optimize(0)));
 
@@ -29,9 +28,9 @@ void wipe_cache(){
 int reinitialize_matrices(v4d **A, v4d **B, v4d **C){
   int ret = 0;
   puts("Initializing...");
-  v4d* A_2 = _aligned_malloc(N*N*sizeof(double),64);//Allign to cachelines instead.
-  v4d* B_2 = _aligned_malloc(N*N*sizeof(double),64);
-  v4d* C_2 = _aligned_malloc(N*N*sizeof(double),64);
+  v4d* A_2 = _mm_malloc(N*N*sizeof(double),64);//Allign to cachelines instead.
+  v4d* B_2 = _mm_malloc(N*N*sizeof(double),64);
+  v4d* C_2 = _mm_malloc(N*N*sizeof(double),64);
   ret = ((A_2==NULL)||(B_2==NULL)||(C_2==NULL));
   if(ret != 0)
     return ret;
@@ -42,9 +41,9 @@ int reinitialize_matrices(v4d **A, v4d **B, v4d **C){
       //((double*)C_2)[y*N+x] = rand() /((double) RAND_MAX);
     }
   }
-  _aligned_free(*A);
-  _aligned_free(*B);
-  _aligned_free(*C);
+  _mm_free(*A);
+  _mm_free(*B);
+  _mm_free(*C);
   *A = A_2;
   *B = B_2;
   *C = C_2;
@@ -76,6 +75,28 @@ int main(int argc, char** argv){
     T
   );
   printf("vector2\tticks/iteration: %.6e\n", ((double)T)/LOOPS);
+
+  reinitialize_matrices(&A, &B, &C);
+  puts("Running simd_3...");
+  TIME_CALL(
+    for(int i = 0; i < LOOPS; i++){
+      MxM_square_3(A,B,C, N);
+    },
+    T
+  );
+  printf("vector3\tticks/iteration: %.6e\n", ((double)T)/LOOPS);
+
+  reinitialize_matrices(&A, &B, &C);
+  puts("Running simd_T...");
+  TIME_CALL(
+    for(int i = 0; i < LOOPS; i++){
+      M_transpose(B, C, N);
+      MxM_square_T(A,C,B, N);
+    },
+    T
+  );
+  printf("vectorT\tticks/iteration: %.6e\n", ((double)T)/LOOPS);
+
   reinitialize_matrices(&A, &B, &C);
   puts("Running scalar...");
   TIME_CALL(
