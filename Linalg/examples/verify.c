@@ -1,5 +1,4 @@
-#include <bench.h>
-#include <matrix.h>
+#include <linalg/matrix.h>
 #include <stdio.h>
 #include <math.h>
 

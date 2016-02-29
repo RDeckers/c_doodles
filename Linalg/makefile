@@ -1,51 +1,69 @@
 rwildcard=$(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2) $(filter $(subst *, %,$2),$d))
+directories=$(sort $(dir $(wildcard $/*)))
 ifeq ($(OS),Windows_NT)
+	REPORT = @echo -e $1"
 	CHK_DIR_EXISTS = if not exist "$(strip $1)" mkdir "$(strip $1)"
 	NUKE = rmdir /s /q
 	COPY_DIR = xcopy $1 $2 /E /H /Y
-	COPY = xcopy $1 $2
 	FIX_PATH = $(subst /,\,$1)
-	LIB_SUFFIX = .dll
+	INSTALL_LIB_DIR := Z:/lib/
+	INSTALL_BIN_DIR := Z:/bin/
+	INSTALL_INCLUDE_DIR := Z:/include/
+	LIB_SUFFIX =.dll
 else
+	REPORT = @echo -e "\e[4;1;37m$1\033[0m"
 	CHK_DIR_EXISTS = test -d $1 || mkdir -p $1
 	NUKE = rm -r $1
 	COPY_DIR = cp -rv $1 $2
-	COPY = cp $1 $2
 	FIX_PATH = $1
-	LIB_SUFFIX = .so
+	INSTALL_LIB_DIR := ~/lib/
+	INSTALL_BIN_DIR := ~/bin/
+	INSTALL_INCLUDE_DIR := ~/include/
+	LIB_SUFFIX :=.so
 endif
 PROJECT_DIR :=$(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 OBJ_DIR := $(PROJECT_DIR)obj
 BIN_DIR := $(PROJECT_DIR)bin
+EXAMPLE_BIN_DIR := $(BIN_DIR)/examples
 SRC_DIR := $(PROJECT_DIR)src
-EXAMPLE_DIR := $(PROJECT_DIR)examples
-LIB_DIR := $(BIN_DIR)
-LIB_NAME := linalg
-
+LIB_DIR := $(PROJECT_DIR)lib
+EXAMPLE_DIR := $(PROJECT_DIR)/examples
 C_FILES := $(call rwildcard, $(SRC_DIR), *.c)
 EXAMPLE_C_FILES := $(call rwildcard, $(EXAMPLE_DIR), *.c)
+EXAMPLES := $(patsubst $(EXAMPLE_DIR)/%.c, $(EXAMPLE_BIN_DIR)/%, $(EXAMPLE_C_FILES))
+
 OBJ_FILES = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(C_FILES))
-EXAMPLES := $(patsubst $(EXAMPLE_DIR)/%.c,$(EXAMPLE_BIN_DIR)/%,$(EXAMPLE_C_FILES))
 
-C_FLAGS += --std=gnu99 -O3 -pipe -march=native -I$(PROJECT_DIR)headers
+LIB_NAME := linalg
 
-lib: $(C_FILES)
+LD_FLAGS += --std=gnu99 -march=native
+C_FLAGS += --std=gnu99 -O2 -pipe -march=native -I$(PROJECT_DIR)headers
+
+
+lib: $(OBJ_FILES)
+	$(call REPORT,Building $@)
 	$(call CHK_DIR_EXISTS, $(LIB_DIR))
-	gcc -fpic -shared $(C_FLAGS) -o $(LIB_DIR)/lib$(LIB_NAME)$(LIB_SUFFIX) $<
+	gcc -shared $(LD_FLAGS) -o $(LIB_DIR)/lib$(LIB_NAME)$(LIB_SUFFIX) $(OBJ_FILES)
 
-all : 4x4 square verify verify_transpose
+install: lib
+	$(call REPORT, Installing files...)
+	cp $(LIB_DIR)/lib$(LIB_NAME)$(LIB_SUFFIX) $(INSTALL_LIB_DIR)
+	cp -r $(PROJECT_DIR)headers/* $(INSTALL_INCLUDE_DIR)
 
-square : $(EXAMPLE_DIR)/MxM_square.c lib
-	gcc $(C_FLAGS) -L $(LIB_DIR) -Wl,-R -Wl,$(LIB_DIR) -Wl,-rpath=$(LIB_DIR) -Wl,-llinalg -o $(BIN_DIR)/MxM_square $(EXAMPLE_DIR)/MxM_square.c
+all : lib examples
 
-4x4 : $(EXAMPLE_DIR)/MxM_4x4.c lib
-	gcc $(C_FLAGS) -L $(LIB_DIR) -Wl,-R -Wl,$(LIB_DIR) -Wl,-rpath=$(LIB_DIR) -Wl,-llinalg -o $(BIN_DIR)/MxM_4x4 $(EXAMPLE_DIR)/MxM_4x4.c
+examples: lib $(EXAMPLES)
 
-verify : $(EXAMPLE_DIR)/verify.c lib
-	gcc $(C_FLAGS) -L $(LIB_DIR) -Wl,-R -Wl,$(LIB_DIR) -Wl,-rpath=$(LIB_DIR) -Wl,-llinalg -o $(BIN_DIR)/verify $(EXAMPLE_DIR)/verify.c
+$(EXAMPLE_BIN_DIR)% : $(EXAMPLE_DIR)%.c
+	$(call REPORT,Building $@)
+	$(call CHK_DIR_EXISTS, $(dir $@))
+	gcc $(C_FLAGS) $(LD_FLAGS) -o "$@" "$<" $(LIB_DIR)/lib$(LIB_NAME)$(LIB_SUFFIX)
 
-verify_transpose : $(EXAMPLE_DIR)/verify_transpose.c lib
-	gcc $(C_FLAGS) -L $(LIB_DIR) -Wl,-R -Wl,$(LIB_DIR) -Wl,-rpath=$(LIB_DIR) -Wl,-llinalg -o $(BIN_DIR)/verify_transpose $(EXAMPLE_DIR)/verify_transpose.c
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
+	$(call REPORT,Compiling $@)
+	$(call CHK_DIR_EXISTS, $(dir $@))
+	gcc -fpic $(C_FLAGS) -o "$@" -c "$<"
 
 clean:
-	$(NUKE) "$(BIN_DIR)"
+	$(call REPORT,Cleaning...)
+	-$(NUKE) "$(EXAMPLE_BIN_DIR)" "$(OBJ_DIR)" "$(BIN_DIR)" "$(LIB_DIR)"

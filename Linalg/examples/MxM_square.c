@@ -1,9 +1,23 @@
-#include <bench.h>
-#include <matrix.h>
+#include <linalg/matrix.h>
 #include <stdio.h>
 
 #include <stdlib.h>
 #include <mm_malloc.h>
+
+#include <time.h>
+
+double time_diff(struct timespec start, struct timespec end)
+{
+    struct timespec temp;
+    if ((end.tv_nsec-start.tv_nsec)<0) {
+        temp.tv_sec = end.tv_sec-start.tv_sec-1;
+        temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
+    } else {
+        temp.tv_sec = end.tv_sec-start.tv_sec;
+        temp.tv_nsec = end.tv_nsec-start.tv_nsec;
+    }
+    return (double)temp.tv_sec*1e9 +  (double)temp.tv_nsec;
+}
 
 #define N 8*64 //size of our matrix measured in doubles. Always a multiple of 4 to make our lives easier
 #define _aligned_malloc(S,A) aligned_malloc(A,S)
@@ -57,55 +71,50 @@ int main(int argc, char** argv){
   v4d *A = NULL, *B = NULL, *C = NULL;
   reinitialize_matrices(&A, &B, &C);
   #define LOOPS (1 << 0)
+  struct timespec t0, t1;
+
   size_t T;
   puts("Running simd...");
-  TIME_CALL(
-    for(int i = 0; i < LOOPS; i++){
+  clock_gettime(CLOCK_MONOTONIC, &t0);
+  for(int i = 0; i < LOOPS; i++){
       MxM_square(A,B,C, N);
-    },
-    T
-  );
-  printf("vector\tticks/iteration: %.6e\n", ((double)T)/LOOPS);
+  }
+  clock_gettime(CLOCK_MONOTONIC, &t1);
+  printf("vector_1\tticks/iteration: %e\n", time_diff(t0,t1));
   reinitialize_matrices(&A, &B, &C);
   puts("Running simd_2...");
-  TIME_CALL(
-    for(int i = 0; i < LOOPS; i++){
-      MxM_square_2(A,B,C, N);
-    },
-    T
-  );
-  printf("vector2\tticks/iteration: %.6e\n", ((double)T)/LOOPS);
+  clock_gettime(CLOCK_MONOTONIC, &t0);
+  for(int i = 0; i < LOOPS; i++){
+    MxM_square_2(A,B,C, N);
+  }
+  clock_gettime(CLOCK_MONOTONIC, &t1);
+  printf("vector_2\tticks/iteration: %e\n", time_diff(t0,t1));
 
   reinitialize_matrices(&A, &B, &C);
   puts("Running simd_3...");
-  TIME_CALL(
-    for(int i = 0; i < LOOPS; i++){
-      MxM_square_3(A,B,C, N);
-    },
-    T
-  );
-  printf("vector3\tticks/iteration: %.6e\n", ((double)T)/LOOPS);
+  clock_gettime(CLOCK_MONOTONIC, &t0);
+  for(int i = 0; i < LOOPS; i++){
+    MxM_square_3(A,B,C, N);
+  }
+  clock_gettime(CLOCK_MONOTONIC, &t1);
+  printf("vector_3\tticks/iteration: %e\n", time_diff(t0,t1));
 
   reinitialize_matrices(&A, &B, &C);
   puts("Running simd_T...");
-  TIME_CALL(
-    for(int i = 0; i < LOOPS; i++){
-      M_transpose(B, C, N);
-      MxM_square_T(A,C,B, N);
-    },
-    T
-  );
-  printf("vectorT\tticks/iteration: %.6e\n", ((double)T)/LOOPS);
+  clock_gettime(CLOCK_MONOTONIC, &t0);
+  for(int i = 0; i < LOOPS; i++){
+    MxM_square_T(A,B,C, N);
+  }
+  clock_gettime(CLOCK_MONOTONIC, &t1);
+  printf("vector_T\tticks/iteration: %e\n", time_diff(t0,t1));
 
   reinitialize_matrices(&A, &B, &C);
   puts("Running scalar...");
-  TIME_CALL(
-    for(int i = 0; i < LOOPS; i++){
-      MxM_square_scalar((double*)A,(double*)B,(double*)C, N);
-    },
-    T
-  );
-
-  printf("scalar\tticks/iteration: %.6e\n", ((double)T)/LOOPS);
+  clock_gettime(CLOCK_MONOTONIC, &t0);
+  for(int i = 0; i < LOOPS; i++){
+    MxM_square_scalar((double*)A,(double*)B,(double*)C, N);
+  }
+  clock_gettime(CLOCK_MONOTONIC, &t1);
+  printf("scalar\tticks/iteration: %e\n", time_diff(t0,t1));
   return 0;
 }
