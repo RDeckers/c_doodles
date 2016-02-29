@@ -1,0 +1,4 @@
+what works:
+  *start-up: each thread starting up, optional binding, returning from main thread.
+*Now give each thread it's own SPMC container to push work too, possibly steal work from.
+*have the 'q' keep track of each queue, define a work stealing function which picks a queue and steals work from it.
