@@ -1,4 +1,4 @@
-#include "../headers/intutils.h"
+#include <utilities/integer.h>
 
 int isqrt(int n){
   int sign = signOf(n);
@@ -7,7 +7,7 @@ int isqrt(int n){
   while(iabs(next-cur) > 1){
     cur = next;
     next = (cur + n/cur)/2;
-  } 
+  }
   return sign*next;
 }
 
@@ -23,7 +23,7 @@ unsigned usqrt(unsigned x){ //fails on x= UINT_MAX, gives 0.
 
 void generatePrimes(unsigned *primes, unsigned N_PRIMES){
   unsigned int incr = 2, incrLoop = 2;
-  unsigned seed_primes = {2,3,5,7,11,13};
+  unsigned seed_primes[] = {2,3,5,7,11,13};
   if(N_PRIMES < 6){//seed primes enough
     for(unsigned u = 0; u < N_PRIMES;u++)
     primes[u] = seed_primes[u];
@@ -35,13 +35,14 @@ void generatePrimes(unsigned *primes, unsigned N_PRIMES){
   primes[3] = seed_primes[3];
   primes[4] = seed_primes[4];
   primes[5] = seed_primes[5];
-  unsigned int MaxDiv = 4;
-  unsigned int stepsToNextMaxDiv = 9;
-  unsigned int stepsTaken = 1;
+  unsigned MaxDiv = 4;
+  unsigned stepsToNextMaxDiv = 9;
+  unsigned stepsTaken = 1;
   unsigned currentPrime = 5;
-  unsigned int  nextNumber=17;
-  unsigned int residue;
-  unsigned int i;
+  unsigned nextNumber=17;
+  unsigned residue;
+  unsigned i;
+  unsigned max_prime_spot = 5;
   while(currentPrime < N_PRIMES  - 1)
   {
     incrLoop = 2;
