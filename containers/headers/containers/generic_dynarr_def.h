@@ -3,6 +3,16 @@
 
 #define DEFINE_DYNARR(SUFFIX, TYPE)\
   typedef struct{TYPE *base; size_t count; size_t size;}dynarr##SUFFIX##_t;\
+  dynarr##SUFFIX##_t* createDynarr##SUFFIX(unsigned Size);\
+  extern inline void forcePushDynarr##SUFFIX(dynarr##SUFFIX##_t *dynarr, TYPE x);\
+  extern inline void forcePushArrayDynarr##SUFFIX(dynarr##SUFFIX##_t *dynarr, TYPE *array, size_t n);\
+  int pushDynarr##SUFFIX(dynarr##SUFFIX##_t *dynarr, TYPE x);\
+  int pushArrayDynarr##SUFFIX(dynarr##SUFFIX##_t *dynarr, TYPE *array, size_t n);\
+  extern inline TYPE forcePopDynarr##SUFFIX(dynarr##SUFFIX##_t *dynarr);\
+  int PopDynarr##SUFFIX(dynarr##SUFFIX##_t *dynarr, TYPE *y);\
+  int shrinkToFitDynarr##SUFFIX(dynarr##SUFFIX##_t *dynarr);
+
+#define IMPLEMENT_DYNARR(SUFFIX, TYPE)\
   dynarr##SUFFIX##_t* createDynarr##SUFFIX(unsigned Size){\
     Size  = 0 == Size? 128 : Size;\
     dynarr##SUFFIX##_t* ret = malloc(sizeof(dynarr##SUFFIX##_t));\
